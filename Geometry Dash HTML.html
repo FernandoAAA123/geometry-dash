@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Geometry Dash</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@800;900&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;}
+body{display:flex;align-items:center;justify-content:center;}
+
+#root{
+  width:100vw;height:100vh;
+  position:relative;
+  overflow:hidden;
+}
+
+/* ════════════════════════════════════
+   PANTALLA PRINCIPAL
+════════════════════════════════════ */
+#screen-main{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;
+  background:#1a2a3a;
+}
+
+/* Fondo — imagen que se repite horizontalmente y se desplaza */
+#main-bg{
+  position:absolute;inset:0;
+  background:url('https://chibi.iitranq.co.uk/i0gWw6zrNkpP.png') repeat-x left center / auto 100%;
+  animation:bgScroll 20s linear infinite;
+}
+@keyframes bgScroll{
+  from{background-position:0 center;}
+  to{background-position:-960px center;}
+}
+
+
+/* Logo */
+#main-logo{
+  position:relative;z-index:2;
+  text-align:center;
+  margin-top:18px;
+  height:90px;
+  display:flex;align-items:center;justify-content:center;
+}
+#main-logo img{
+  /* URL real: src="https://..." */
+  max-height:90px;
+  /* fallback si no hay imagen: */
+  display:block;
+}
+#main-logo-fallback{
+  /* Quitar cuando haya imagen real */
+  font-family:'Nunito',sans-serif;
+  font-weight:900;
+  font-size:52px;
+  color:#76ee20;
+  text-shadow:4px 4px 0 #1a5a00,-2px -2px 0 #2a8800,0 0 30px rgba(120,240,40,.4);
+  letter-spacing:2px;
+  line-height:1;
+  display:flex;flex-direction:column;align-items:center;gap:0;
+}
+#main-logo-fallback span.lite{
+  font-size:22px;color:#f0c820;
+  text-shadow:2px 2px 0 #7a5000;
+  align-self:flex-end;margin-top:-8px;margin-right:-4px;
+}
+
+/* Franja separadora (línea horizontal entre logo y botones) */
+#main-divider{
+  position:relative;z-index:2;
+  width:100%;height:2px;
+  background:rgba(255,255,255,.1);
+  margin-top:4px;
+}
+
+/* Botones centrales */
+#main-center{
+  position:relative;z-index:2;
+  display:flex;align-items:center;justify-content:center;
+  gap:60px;
+  flex:1;
+  padding-bottom:12px;
+}
+
+/* Cada botón central es una imagen */
+.center-btn{
+  cursor:pointer;
+  transition:transform .1s;
+  display:flex;flex-direction:column;align-items:center;
+}
+.center-btn:hover{transform:scale(1.08);}
+.center-btn:active{transform:scale(.93);}
+.center-btn img{
+  display:block;
+  /* tamaño por defecto — ajusta con width/height en cada img */
+}
+
+
+
+/* ── Suelo animado (menú principal) ── */
+#main-ground{
+  position:absolute;bottom:0;left:0;width:100%;height:100px;
+  z-index:4;overflow:hidden;
+}
+#main-ground::after,
+#levels-ground::after{
+  content:'';
+  position:absolute;top:0;left:0;
+  width:300%;height:100%;
+  background:url('https://chibi.iitranq.co.uk/2u3hEmug4ArY.png') repeat-x left top / auto 100%;
+  animation:groundScroll 2.5s linear infinite;
+}
+@keyframes groundScroll{
+  from{transform:translateX(0);}
+  to{transform:translateX(-33.333%);}
+}
+
+/* Barra inferior — sobre el suelo */
+#main-bottom{
+  position:relative;z-index:5;
+  width:100%;height:88px;
+  background:transparent;
+  border-top:none;
+  display:flex;align-items:center;
+  padding:0 16px;
+  gap:0;
+  flex-shrink:0;
+}
+
+/* Avatar (izquierda) */
+#bottom-avatar{
+  width:66px;height:66px;
+  border-radius:50%;
+  border:3px solid rgba(255,255,255,.5);
+  overflow:hidden;
+  cursor:pointer;
+  flex-shrink:0;
+  transition:transform .1s;
+  background:#1a4a8a;
+  display:flex;align-items:center;justify-content:center;
+}
+#bottom-avatar:hover{transform:scale(1.06);}
+#bottom-avatar img{width:100%;height:100%;object-fit:cover;}
+
+/* Botones redondos centrados */
+#bottom-btns{
+  display:flex;gap:18px;
+  flex:1;justify-content:center;align-items:center;
+}
+.round-btn{
+  cursor:pointer;transition:transform .1s;
+  width:54px;height:54px;
+  display:flex;align-items:center;justify-content:center;
+}
+.round-btn:hover{transform:scale(1.1);}
+.round-btn:active{transform:scale(.93);}
+.round-btn img{width:54px;height:54px;}
+.round-btn .img-ph{width:54px;height:54px;border-radius:50%;font-size:8px;}
+
+
+/* ════════════════════════════════════
+   PANTALLA SELECCIÓN DE NIVELES
+════════════════════════════════════ */
+#screen-levels{
+  position:absolute;inset:0;
+  display:none;flex-direction:column;align-items:center;
+  justify-content:flex-start;
+  overflow:hidden;
+  transition:background .3s;
+}
+
+/* Fondo sólido que cambia por nivel */
+#levels-bg{
+  position:absolute;inset:0;
+  transition:background .3s;
+}
+
+/* Plataformas inferiores — igual al juego real */
+.lvl-plat{
+  position:absolute;bottom:0;
+  border-radius:4px 4px 0 0;
+  height:56px;
+  opacity:.55;
+}
+
+/* ── Botón volver (triángulo verde, top-left) ── */
+#nav-back{
+  position:absolute;top:14px;left:14px;z-index:10;
+  cursor:pointer;transition:transform .1s;
+}
+#nav-back:hover{transform:scale(1.1);}
+#nav-back:active{transform:scale(.93);}
+#nav-back img{width:54px;height:54px;display:block;}
+
+/* ── Botón info (círculo azul, top-right) ── */
+#nav-info{
+  position:absolute;top:14px;right:14px;z-index:10;
+  cursor:pointer;transition:transform .1s;
+}
+#nav-info:hover{transform:scale(1.1);}
+#nav-info img{width:46px;height:46px;display:block;}
+
+/* ── Flechas laterales grandes ── */
+.nav-arrow{
+  position:absolute;top:50%;transform:translateY(-50%);
+  z-index:10;cursor:pointer;
+  transition:transform .1s, opacity .2s;
+  display:flex;align-items:center;justify-content:center;
+}
+.nav-arrow:hover{transform:translateY(-50%) scale(1.1);}
+.nav-arrow:active{transform:translateY(-50%) scale(.93);}
+#arrow-left{left:10px;}
+#arrow-right{right:10px;}
+.nav-arrow img{width:46px;height:80px;object-fit:contain;opacity:.85;}
+
+/* ── Card del nivel (solo cabecera, arriba-centrada) ── */
+#level-card{
+  position:relative;z-index:5;
+  width:600px;
+  background:rgba(0,10,80,.72);
+  border-radius:14px;
+  padding:14px 18px 14px;
+  margin-top:88px;
+  box-shadow:0 4px 24px rgba(0,0,0,.5);
+}
+
+/* Fila superior: estrella+número alineados arriba-derecha */
+#card-stars-top{
+  position:absolute;right:14px;top:10px;
+  display:flex;align-items:center;gap:5px;
+  font-family:'Nunito',sans-serif;font-weight:900;
+  font-size:17px;color:#fff;
+}
+#card-stars-top img{width:22px;height:22px;display:block;}
+
+/* Fila principal: cara + nombre */
+#card-header{
+  display:flex;align-items:center;gap:12px;
+  padding-right:60px; /* espacio para la estrella */
+}
+#card-face img{width:52px;height:52px;display:block;}
+
+/* Nombre — Small Caps igual al juego */
+#card-name{
+  font-family:'Nunito',sans-serif;font-weight:900;
+  font-size:28px;color:#fff;
+  text-shadow:2px 2px 0 rgba(0,0,0,.55);
+  font-variant:small-caps;
+  letter-spacing:1px;
+}
+
+/* Fila intentos + coins */
+#card-sub{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-top:10px;
+}
+#card-attempts{
+  font-family:'Nunito',sans-serif;font-weight:800;
+  font-size:15px;color:#fff;
+  display:flex;align-items:center;gap:6px;
+}
+#card-attempts img{width:18px;height:18px;display:block;}
+
+/* Monedas (3 círculos grises/dorados) */
+#card-coins{display:flex;gap:8px;}
+.card-coin img{width:34px;height:34px;display:block;}
+.card-coin-grey{filter:grayscale(1) brightness(.6);}
+
+/* ── Barras de progreso — FUERA de la card, centradas ── */
+#level-progress{
+  position:relative;z-index:5;
+  width:600px;
+  margin-top:20px;
+}
+.prog-section{margin-bottom:12px;}
+.prog-label{
+  font-family:'Nunito',sans-serif;font-weight:900;
+  font-size:15px;color:#fff;
+  text-align:center;margin-bottom:5px;
+  font-variant:small-caps;
+  letter-spacing:.8px;
+  text-shadow:1px 1px 0 rgba(0,0,0,.5);
+}
+.prog-track{
+  height:30px;
+  background:rgba(0,0,60,.6);
+  border-radius:15px;
+  overflow:hidden;
+  position:relative;
+  display:flex;align-items:center;justify-content:center;
+}
+.prog-fill{
+  position:absolute;left:0;top:0;height:100%;
+  background:#22dd22;
+  border-radius:15px;
+  transition:width .4s;
+}
+.prog-text{
+  position:relative;z-index:1;
+  font-family:'Nunito',sans-serif;font-weight:900;
+  font-size:14px;color:#fff;
+  text-shadow:1px 1px 0 rgba(0,0,0,.7);
+}
+
+/* ── Botones Play / Practice — bajo las barras ── */
+#level-btns{
+  position:relative;z-index:5;
+  display:flex;gap:16px;
+  margin-top:18px;
+}
+.lvl-btn{
+  padding:11px 36px;border:none;border-radius:10px;cursor:pointer;
+  font-family:'Nunito',sans-serif;font-weight:900;font-size:15px;
+  color:#fff;box-shadow:0 4px 0 rgba(0,0,0,.4);
+  transition:transform .1s;display:flex;align-items:center;gap:8px;
+}
+.lvl-btn:hover{transform:scale(1.05);}
+.lvl-btn:active{transform:scale(.97) translateY(2px);box-shadow:0 2px 0 rgba(0,0,0,.4);}
+#btn-play-lvl{background:#2ab52a;}
+#btn-prac-lvl{background:#1a99cc;}
+.lvl-btn img{width:18px;height:18px;}
+
+/* ── Suelo animado (selector de niveles) ── */
+#levels-ground{
+  position:absolute;bottom:0;left:0;width:100%;height:80px;
+  z-index:6;overflow:hidden;
+}
+
+/* ════════════════════════════════════
+   PANTALLA CUSTOMIZE CHARACTER
+════════════════════════════════════ */
+#screen-customize{
+  position:absolute;inset:0;
+  display:none;flex-direction:column;align-items:center;
+  background:linear-gradient(180deg,#1a0044 0%,#2a0066 50%,#1a0044 100%);
+  overflow:hidden;
+}
+
+/* Fondo con cuadrícula sutil */
+#cust-bg{
+  position:absolute;inset:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px);
+  background-size:48px 48px;
+}
+
+/* Header */
+#cust-header{
+  position:relative;z-index:2;
+  width:100%;height:56px;
+  background:rgba(0,0,0,.35);
+  border-bottom:2px solid rgba(255,255,255,.1);
+  display:flex;align-items:center;padding:0 16px;gap:14px;
+  flex-shrink:0;
+}
+#cust-back{
+  cursor:pointer;transition:transform .1s;
+}
+#cust-back:hover{transform:scale(1.1);}
+#cust-back img{width:36px;height:36px;display:block;}
+#cust-title{
+  font-family:'Nunito',sans-serif;font-weight:900;
+  font-size:20px;color:#fff;font-variant:small-caps;
+  letter-spacing:1px;
+}
+
+/* Cuerpo principal */
+#cust-body{
+  position:relative;z-index:2;
+  display:flex;gap:32px;
+  align-items:flex-start;
+  justify-content:center;
+  padding:28px 20px 0;
+  width:100%;
+}
+
+/* Panel izquierdo: preview */
+#cust-preview{
+  display:flex;flex-direction:column;align-items:center;gap:16px;
+  flex-shrink:0;
+}
+#cust-canvas-wrap{
+  width:160px;height:160px;
+  background:rgba(0,0,0,.4);
+  border-radius:16px;
+  border:2px solid rgba(255,255,255,.15);
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;
+}
+#cust-canvas{display:block;}
+#cust-preview-label{
+  font-family:'Nunito',sans-serif;font-weight:800;
+  font-size:12px;color:rgba(255,255,255,.5);
+  letter-spacing:1px;text-transform:uppercase;
+}
+
+/* Tabs de tipo (CUBE, SHIP, BALL...) */
+#cust-tabs{
+  display:flex;gap:6px;margin-top:4px;
+}
+.cust-tab{
+  padding:5px 14px;
+  font-family:'Nunito',sans-serif;font-weight:900;font-size:11px;
+  border:none;border-radius:20px;cursor:pointer;
+  background:rgba(255,255,255,.1);color:rgba(255,255,255,.5);
+  transition:all .1s;
+}
+.cust-tab.active{background:#7700cc;color:#fff;box-shadow:0 2px 8px #7700cc88;}
+.cust-tab:hover{background:rgba(255,255,255,.2);}
+
+/* Panel derecho: controles de color */
+#cust-controls{
+  flex:1;max-width:520px;
+}
+
+/* Sección de color */
+.color-section{
+  margin-bottom:20px;
+}
+.color-section-label{
+  font-family:'Nunito',sans-serif;font-weight:900;
+  font-size:13px;color:rgba(255,255,255,.7);
+  letter-spacing:1px;text-transform:uppercase;
+  margin-bottom:10px;
+  display:flex;align-items:center;gap:8px;
+}
+.color-dot-preview{
+  width:16px;height:16px;border-radius:50%;
+  border:2px solid rgba(255,255,255,.4);
+  flex-shrink:0;
+}
+
+/* Paleta de colores */
+.color-palette{
+  display:flex;flex-wrap:wrap;gap:8px;
+}
+.color-swatch{
+  width:36px;height:36px;border-radius:8px;
+  cursor:pointer;border:3px solid transparent;
+  transition:transform .1s,border-color .1s;
+  position:relative;
+}
+.color-swatch:hover{transform:scale(1.15);}
+.color-swatch.selected{
+  border-color:#fff;
+  box-shadow:0 0 10px rgba(255,255,255,.5);
+  transform:scale(1.15);
+}
+
+/* Input color custom */
+.color-custom-wrap{
+  display:flex;align-items:center;gap:8px;margin-top:10px;
+}
+.color-custom-wrap input[type=color]{
+  width:36px;height:36px;border:none;border-radius:8px;cursor:pointer;
+  padding:0;background:none;
+}
+.color-custom-label{
+  font-family:'Nunito',sans-serif;font-weight:800;
+  font-size:11px;color:rgba(255,255,255,.5);
+}
+
+/* Botón guardar */
+#cust-save{
+  display:block;
+  margin:20px auto 0;
+  padding:12px 48px;
+  background:linear-gradient(155deg,#60d840,#38a018);
+  border:none;border-radius:12px;cursor:pointer;
+  font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;
+  color:#fff;box-shadow:0 5px 0 rgba(0,0,0,.4);
+  transition:transform .1s;
+}
+#cust-save:hover{transform:scale(1.05);}
+#cust-save:active{transform:scale(.97) translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.4);}
+</style>
+</head>
+<body>
+<div id="root">
+
+<!-- ══════════ AUDIO ══════════ -->
+<audio id="menu-music" src="https://www.image2url.com/r2/default/audio/1781373763372-146b8fb4-0e07-4743-9f37-a93e4854bc30.mp3" loop></audio>
+
+<!-- ══════════ PANTALLA PRINCIPAL ══════════ -->
+<div id="screen-main">
+  <!-- Fondo animado -->
+  <div id="main-bg"></div>
+
+  <div id="main-logo">
+    <img src="https://chibi.iitranq.co.uk/v5fYsIGGbU7g.png" alt="Geometry Dash" style="max-height:70px">
+  </div>
+
+  <div id="main-divider"></div>
+
+  <div id="main-center">
+
+    <div class="center-btn" onclick="goCustomize()">
+      <img src="https://chibi.iitranq.co.uk/8rwtz5K0mGuc.png" width="110" height="110">
+    </div>
+
+    <div class="center-btn" onclick="goLevels()">
+      <img src="https://chibi.iitranq.co.uk/5JKfdOyPle6Z.png" width="155" height="155">
+    </div>
+
+    <div class="center-btn" onclick="alert('Endless')">
+      <img src="https://chibi.iitranq.co.uk/lcy0DBdaVmqE.png" width="110" height="110">
+    </div>
+
+  </div>
+
+  <!-- Suelo animado -->
+  <div id="main-ground"></div>
+
+  <div id="main-bottom">
+
+    <div id="bottom-avatar" onclick="alert('Profile')">
+      <img src="https://chibi.iitranq.co.uk/iHAzMjaYDGSJ.png" width="60" height="60">
+    </div>
+
+    <div id="bottom-btns">
+
+      <div class="round-btn" onclick="openSettings()">
+        <img src="https://chibi.iitranq.co.uk/mXZAyOpw6Ewo.png" width="54" height="54">
+      </div>
+
+      <div class="round-btn" onclick="alert('Achievements')">
+        <img src="https://chibi.iitranq.co.uk/ejVK2Z3PwGfY.png" width="54" height="54">
+      </div>
+
+      <div class="round-btn" id="btn-mute" onclick="toggleMusic()">
+        <img id="mute-icon" src="https://chibi.iitranq.co.uk/mXZAyOpw6Ewo.png" width="54" height="54">
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+<div id="screen-levels">
+  <div id="levels-bg"></div>
+
+  <!-- Suelo animado -->
+  <div id="levels-ground"></div>
+
+  <!-- Plataformas decorativas inferiores -->
+  <div class="lvl-plat" style="left:0;width:150px;"></div>
+  <div class="lvl-plat" style="left:170px;width:220px;height:44px;"></div>
+  <div class="lvl-plat" style="right:170px;width:220px;height:44px;"></div>
+  <div class="lvl-plat" style="right:0;width:150px;"></div>
+
+  <!-- Volver -->
+  <div id="nav-back" onclick="goMain()">
+    <img src="https://chibi.iitranq.co.uk/fnImLomPhZ8V.png" width="54" height="54">
+  </div>
+
+  <!-- Info -->
+  <div id="nav-info">
+    <img src="https://chibi.iitranq.co.uk/1A8zw1uvt0Gl.png" width="46" height="46">
+  </div>
+
+  <!-- Flecha izquierda -->
+  <div class="nav-arrow" id="arrow-left" onclick="changeLevel(-1)">
+    <img src="https://chibi.iitranq.co.uk/hCskzB25cTCH.png">
+  </div>
+
+  <!-- Flecha derecha -->
+  <div class="nav-arrow" id="arrow-right" onclick="changeLevel(1)">
+    <img src="https://chibi.iitranq.co.uk/oLLzbIUFWZcy.png">
+  </div>
+
+  <!-- Card: solo cabecera -->
+  <div id="level-card">
+    <div id="card-stars-top">
+      <span id="card-star-count">1</span>
+      <img src="https://chibi.iitranq.co.uk/idoHpIqM8qn7.png" width="22" height="22">
+    </div>
+
+    <div id="card-header">
+      <div id="card-face">
+        <img id="card-face-img" src="" width="52" height="52">
+      </div>
+      <div id="card-name">Stereo Madness</div>
+    </div>
+
+    <div id="card-sub">
+      <div id="card-attempts">
+        <span id="card-attempts-txt">0/3</span>
+        <img src="https://chibi.iitranq.co.uk/PpK2tajalVZW.png" width="18" height="18">
+      </div>
+      <div id="card-coins">
+        <div class="card-coin" id="ccoin0">
+          <img class="coin-img" src="https://chibi.iitranq.co.uk/PpK2tajalVZW.png" width="34" height="34">
+        </div>
+        <div class="card-coin" id="ccoin1">
+          <img class="coin-img" src="https://chibi.iitranq.co.uk/PpK2tajalVZW.png" width="34" height="34">
+        </div>
+        <div class="card-coin" id="ccoin2">
+          <img class="coin-img" src="https://chibi.iitranq.co.uk/PpK2tajalVZW.png" width="34" height="34">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Barras fuera de la card -->
+  <div id="level-progress">
+    <div class="prog-section">
+      <div class="prog-label">Normal Mode</div>
+      <div class="prog-track">
+        <div class="prog-fill" id="prog-normal" style="width:0%"></div>
+        <div class="prog-text" id="prog-normal-txt">0%</div>
+      </div>
+    </div>
+    <div class="prog-section" style="margin-bottom:0">
+      <div class="prog-label">Practice Mode</div>
+      <div class="prog-track">
+        <div class="prog-fill" id="prog-practice" style="width:0%"></div>
+        <div class="prog-text" id="prog-practice-txt">0%</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Botones Play / Practice -->
+  <div id="level-btns">
+    <button class="lvl-btn" id="btn-play-lvl">
+      <img src="https://chibi.iitranq.co.uk/fnImLomPhZ8V.png" width="18" height="18"> Play
+    </button>
+    <button class="lvl-btn" id="btn-prac-lvl">◎ Practice</button>
+  </div>
+
+  <div id="level-dots"></div>
+</div><!-- /screen-levels -->
+
+<!-- ══════════ PANTALLA CUSTOMIZE ══════════ -->
+<div id="screen-customize">
+  <div id="cust-bg"></div>
+
+  <div id="cust-header">
+    <div id="cust-back" onclick="goMain()">
+      <img src="https://chibi.iitranq.co.uk/fnImLomPhZ8V.png" width="36" height="36">
+    </div>
+    <div id="cust-title">Customize Character</div>
+  </div>
+
+  <div id="cust-body">
+
+    <!-- Preview del cubo -->
+    <div id="cust-preview">
+      <div id="cust-canvas-wrap">
+        <canvas id="cust-canvas" width="140" height="140"></canvas>
+      </div>
+      <div id="cust-preview-label">Preview</div>
+      <div id="cust-tabs">
+        <button class="cust-tab active" onclick="selectType('cube',this)">Cube</button>
+        <button class="cust-tab" onclick="selectType('ship',this)">Ship</button>
+        <button class="cust-tab" onclick="selectType('ball',this)">Ball</button>
+      </div>
+    </div>
+
+    <!-- Controles -->
+    <div id="cust-controls">
+
+      <div class="color-section">
+        <div class="color-section-label">
+          <div class="color-dot-preview" id="dot-primary"></div>
+          Color Primario
+        </div>
+        <div class="color-palette" id="palette-primary"></div>
+        <div class="color-custom-wrap">
+          <input type="color" id="custom-primary" value="#4ec840">
+          <span class="color-custom-label">Color personalizado</span>
+        </div>
+      </div>
+
+      <div class="color-section">
+        <div class="color-section-label">
+          <div class="color-dot-preview" id="dot-secondary"></div>
+          Color Secundario
+        </div>
+        <div class="color-palette" id="palette-secondary"></div>
+        <div class="color-custom-wrap">
+          <input type="color" id="custom-secondary" value="#00b0e0">
+          <span class="color-custom-label">Color personalizado</span>
+        </div>
+      </div>
+
+      <button id="cust-save" onclick="saveCustomize()">✓ Guardar</button>
+    </div>
+
+  </div>
+</div><!-- /screen-customize -->
+
+</div><!-- /root -->
+
+<script>
+// ══════════════════════════════════════
+// CARAS DE DIFICULTAD
+// Pon aquí la URL de cada imagen de dificultad.
+// El sistema las aplica solo — en los niveles
+// solo escribes difficulty: 'easy', 'hard', etc.
+//
+// Dificultades disponibles:
+//   auto      → nivel sin dificultad asignada (N/A)
+//   easy      → cara azul sonriente
+//   normal    → cara amarilla
+//   hard      → cara naranja
+//   harder    → cara roja
+//   insane    → cara morada
+//   easy_demon, medium_demon, hard_demon,
+//   insane_demon, extreme_demon
+// ══════════════════════════════════════
+const DIFF_FACES = {
+  auto:           'URL_FACE_AUTO',
+  easy:           'https://chibi.iitranq.co.uk/76gq3G448y40.png',
+  normal:         'https://chibi.iitranq.co.uk/zrHXp7oQQucG.png',
+  hard:           'https://chibi.iitranq.co.uk/09oj3MaQKwK3.png',
+  harder:         'https://chibi.iitranq.co.uk/yPFUZkJsbRfg.png',
+  insane:         'https://chibi.iitranq.co.uk/5dCDuCmlM9W3.png',
+  easy_demon:     'URL_FACE_EASY_DEMON',
+  medium_demon:   'URL_FACE_MEDIUM_DEMON',
+  hard_demon:     'URL_FACE_HARD_DEMON',
+  insane_demon:   'URL_FACE_INSANE_DEMON',
+  extreme_demon:  'URL_FACE_EXTREME_DEMON',
+};
+// ══════════════════════════════════════
+
+// ══════════════════════════════════════
+// DATOS DE NIVELES
+// Para añadir un nivel: agrega un objeto.
+// url: ruta al HTML del nivel.
+// bgColor: color de fondo de la pantalla de selección para ese nivel.
+// ══════════════════════════════════════
+const LEVELS = [
+  { id:'stereo_madness',  name:'Stereo Madness',  stars:1,  difficulty:'easy',   bgColor:'#1a1acc', url:'stereo_madness.html', locked:false },
+  { id:'back_on_track',   name:'Back On Track',   stars:2,  difficulty:'easy',   bgColor:'#cc22cc', url:'#', locked:true },
+  { id:'polargeist',      name:'Polargeist',      stars:3,  difficulty:'normal', bgColor:'#ee4400', url:'#', locked:true },
+  { id:'dry_out',         name:'Dry Out',         stars:4,  difficulty:'normal', bgColor:'#bb8800', url:'#', locked:true },
+  { id:'base_after_base', name:'Base After Base', stars:5,  difficulty:'hard',   bgColor:'#00aa44', url:'#', locked:true },
+  { id:'cant_let_go',     name:"Can't Let Go",    stars:6,  difficulty:'hard',   bgColor:'#008888', url:'#', locked:true },
+  { id:'jumper',          name:'Jumper',          stars:7,  difficulty:'harder', bgColor:'#cc6600', url:'#', locked:true },
+  { id:'time_machine',    name:'Time Machine',    stars:8,  difficulty:'harder', bgColor:'#006699', url:'#', locked:true },
+  { id:'cycles',          name:'Cycles',          stars:9,  difficulty:'harder', bgColor:'#226600', url:'#', locked:true },
+  { id:'xstep',           name:'xStep',           stars:10, difficulty:'insane', bgColor:'#00aacc', url:'#', locked:true },
+];
+
+let currentIdx = 0;
+
+function getProgress(id, mode){
+  try{ return parseFloat(localStorage.getItem('gd_best_'+mode+'_'+id)||'0'); }catch(e){ return 0; }
+}
+function getCoins(id){
+  try{ return JSON.parse(localStorage.getItem('gd_coins_'+id)||'[false,false,false]'); }catch(e){ return [false,false,false]; }
+}
+
+function buildDots(){
+  const el = document.getElementById('level-dots');
+  el.innerHTML = '';
+  LEVELS.forEach((_,i)=>{
+    const d = document.createElement('div');
+    d.className = 'dot'+(i===currentIdx?' active':'');
+    d.onclick = ()=>{ currentIdx=i; updateCard(); };
+    el.appendChild(d);
+  });
+}
+
+function updateCard(){
+  const lvl = LEVELS[currentIdx];
+
+  document.getElementById('card-name').textContent = lvl.name;
+  document.getElementById('card-star-count').textContent = lvl.stars;
+
+  // Cara de dificultad
+  const faceImg = document.getElementById('card-face-img');
+  faceImg.src = DIFF_FACES[lvl.difficulty] || '';
+
+  // Progreso
+  const n = getProgress(lvl.id,'normal');
+  const p = getProgress(lvl.id,'practice');
+  document.getElementById('prog-normal').style.width = n+'%';
+  document.getElementById('prog-normal-txt').textContent = n+'%';
+  document.getElementById('prog-practice').style.width = p+'%';
+  document.getElementById('prog-practice-txt').textContent = p+'%';
+
+  // Coins — filter grayscale si no recogida
+  const coins = getCoins(lvl.id);
+  [0,1,2].forEach(i=>{
+    const img = document.getElementById('ccoin'+i).querySelector('.coin-img');
+    if(img) img.style.filter = coins[i] ? '' : 'grayscale(1) brightness(.5)';
+  });
+
+  // Fondo del nivel — color sólido
+  const bg = lvl.bgColor || '#0033cc';
+  document.getElementById('levels-bg').style.background = bg;
+  // Plataformas más oscuras que el fondo
+  document.querySelectorAll('.lvl-plat').forEach(p=>{
+    p.style.background = 'rgba(0,0,0,.28)';
+  });
+
+  // Flechas: dim si está en extremo
+  document.getElementById('arrow-left').style.opacity  = currentIdx===0 ? '0.25' : '1';
+  document.getElementById('arrow-right').style.opacity = currentIdx===LEVELS.length-1 ? '0.25' : '1';
+
+  // Dots
+  document.querySelectorAll('.dot').forEach((d,i)=>d.classList.toggle('active',i===currentIdx));
+
+  // Botones locked
+  const locked = lvl.locked;
+  document.getElementById('btn-play-lvl').style.opacity = locked ? '.4' : '1';
+  document.getElementById('btn-play-lvl').style.pointerEvents = locked ? 'none' : '';
+  document.getElementById('btn-prac-lvl').style.opacity = locked ? '.4' : '1';
+  document.getElementById('btn-prac-lvl').style.pointerEvents = locked ? 'none' : '';
+}
+
+function changeLevel(dir){
+  const newIdx = currentIdx + dir;
+  if(newIdx<0||newIdx>=LEVELS.length) return;
+  currentIdx = newIdx;
+  updateCard();
+}
+
+/* Pantallas */
+function showScreen(id){
+  document.getElementById('screen-main').style.display='none';
+  document.getElementById('screen-levels').style.display='none';
+  document.getElementById(id).style.display='flex';
+}
+function goMain(){
+  showScreen('screen-main');
+}
+function goLevels(){
+  buildDots();
+  updateCard();
+  showScreen('screen-levels');
+}
+
+/* Música — arranca sola, nunca para excepto al entrar nivel */
+const music = document.getElementById('menu-music');
+music.volume = 0.8;
+
+// Intentar reproducir inmediatamente
+music.play().catch(()=>{
+  // Navegador bloqueó autoplay — esperar cualquier interacción
+  const unlock = () => { music.play(); document.removeEventListener('click', unlock); document.removeEventListener('keydown', unlock); };
+  document.addEventListener('click', unlock);
+  document.addEventListener('keydown', unlock);
+});
+
+function toggleMusic(){
+  if(music.paused){ music.play(); }
+  else { music.pause(); }
+  const muted = !music.paused ? false : true;
+  document.getElementById('mute-icon').style.filter = music.paused ? 'grayscale(1) brightness(.5)' : '';
+}
+
+// Detener música solo al entrar a un nivel real
+function playLevel(mode){
+  const lvl = LEVELS[currentIdx];
+  if(lvl && lvl.url && lvl.url !== '#'){
+    music.pause();
+    window.location.href = lvl.url + '?mode=' + mode + '&back=' + encodeURIComponent(location.href);
+  }
+}
+document.getElementById('btn-play-lvl').onclick = () => playLevel('normal');
+document.getElementById('btn-prac-lvl').onclick = () => playLevel('practice');
+
+/* Settings */
+function openSettings(){
+  const existing = document.getElementById('settings-panel');
+  if(existing){ existing.remove(); return; }
+  const panel = document.createElement('div');
+  panel.id = 'settings-panel';
+  panel.style.cssText = `
+    position:absolute;bottom:88px;left:70px;z-index:100;
+    background:rgba(0,10,60,.95);border-radius:14px;
+    padding:20px 28px;color:#fff;
+    font-family:'Nunito',sans-serif;font-weight:800;
+    box-shadow:0 4px 24px rgba(0,0,0,.6);
+    min-width:200px;
+  `;
+  panel.innerHTML = `
+    <div style="font-size:18px;margin-bottom:14px;text-align:center;font-variant:small-caps;">Settings</div>
+    <label style="display:flex;align-items:center;gap:10px;margin-bottom:10px;cursor:pointer">
+      <input type="checkbox" ${music.paused?'':'checked'} onchange="this.checked?music.play():music.pause();document.getElementById('mute-icon').style.filter=music.paused?'grayscale(1) brightness(.5)':'';">
+      Music
+    </label>
+    <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+      <input type="checkbox" checked> SFX
+    </label>
+    <div style="margin-top:14px;text-align:center;font-size:12px;opacity:.5">v2.113</div>
+  `;
+  document.getElementById('screen-main').appendChild(panel);
+}
+
+/* Teclado */
+window.addEventListener('keydown',e=>{
+  if(e.code==='Space'&&document.getElementById('screen-main').style.display==='flex') goLevels();
+  if(e.code==='Escape'&&document.getElementById('screen-levels').style.display==='flex') goMain();
+  if(e.code==='ArrowLeft') changeLevel(-1);
+  if(e.code==='ArrowRight') changeLevel(1);
+  if(e.code==='Enter'){
+    const lvl=LEVELS[currentIdx];
+    if(lvl&&!lvl.locked&&lvl.url!=='#') playLevel('normal');
+  }
+});
+
+/* Escala responsive — el root llena toda la pantalla */
+function scaleRoot(){
+  const r  = document.getElementById('root');
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  r.style.width  = vw + 'px';
+  r.style.height = vh + 'px';
+  r.style.transform = '';
+}
+scaleRoot();
+window.addEventListener('resize', scaleRoot);
+
+
+/* ══════════════════════════════════════
+   CUSTOMIZE CHARACTER
+══════════════════════════════════════ */
+
+const PALETTE = [
+  '#ff0000','#ff4400','#ff8800','#ffcc00','#ffff00',
+  '#88cc00','#44cc00','#00cc44','#00ccaa','#00aaff',
+  '#0066ff','#4400ff','#8800cc','#cc00aa','#ff0088',
+  '#ffffff','#cccccc','#888888','#444444','#000000',
+  '#ff88aa','#ffcc88','#88ffcc','#88ccff','#cc88ff',
+  '#4ec840','#00b0e0','#f0a000','#e03030','#c060ff',
+];
+
+let custState = {
+  type: 'cube',
+  primary: '#4ec840',
+  secondary: '#00b0e0',
+};
+
+function loadCustState(){
+  try{
+    const s = localStorage.getItem('gd_char_customize');
+    if(s) custState = {...custState,...JSON.parse(s)};
+  }catch(e){}
+}
+
+function saveCustState(){
+  try{ localStorage.setItem('gd_char_customize', JSON.stringify(custState)); }catch(e){}
+}
+
+function buildPalette(containerId, colorKey){
+  const wrap = document.getElementById(containerId);
+  wrap.innerHTML = '';
+  PALETTE.forEach(color=>{
+    const sw = document.createElement('div');
+    sw.className = 'color-swatch' + (custState[colorKey]===color ? ' selected' : '');
+    sw.style.background = color;
+    sw.title = color;
+    sw.onclick = ()=>{
+      custState[colorKey] = color;
+      document.getElementById(colorKey==='primary'?'custom-primary':'custom-secondary').value = color;
+      refreshPalettes();
+      drawPreview();
+    };
+    wrap.appendChild(sw);
+  });
+}
+
+function refreshPalettes(){
+  buildPalette('palette-primary','primary');
+  buildPalette('palette-secondary','secondary');
+  document.getElementById('dot-primary').style.background = custState.primary;
+  document.getElementById('dot-secondary').style.background = custState.secondary;
+}
+
+function drawPreview(){
+  const canvas = document.getElementById('cust-canvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H);
+
+  const cx=W/2, cy=H/2;
+  const p = custState.primary;
+  const s = custState.secondary;
+
+  if(custState.type==='cube'){
+    const sz = 52;
+    // Sombra
+    ctx.shadowColor='rgba(0,0,0,.4)'; ctx.shadowBlur=12; ctx.shadowOffsetY=4;
+    // Exterior
+    ctx.fillStyle=p;
+    roundRect(ctx, cx-sz, cy-sz, sz*2, sz*2, 10);
+    ctx.fill();
+    ctx.shadowBlur=0; ctx.shadowOffsetY=0;
+    // Borde
+    ctx.strokeStyle=darken(p,.7); ctx.lineWidth=3;
+    roundRect(ctx, cx-sz, cy-sz, sz*2, sz*2, 10);
+    ctx.stroke();
+    // Interior
+    ctx.fillStyle=s;
+    roundRect(ctx, cx-sz+6, cy-sz+6, (sz-6)*2, (sz-6)*2, 6);
+    ctx.fill();
+    // Highlight
+    ctx.fillStyle='rgba(255,255,255,.18)';
+    roundRect(ctx, cx-sz+8, cy-sz+8, (sz-8)*2, 22, 5);
+    ctx.fill();
+    // Ojos
+    ctx.fillStyle='rgba(255,255,255,.9)';
+    ctx.beginPath(); ctx.arc(cx-16, cy-8, 10, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx+16, cy-8, 10, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(0,0,0,.8)';
+    ctx.beginPath(); ctx.arc(cx-14, cy-8, 5, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx+18, cy-8, 5, 0, Math.PI*2); ctx.fill();
+    // Boca
+    ctx.strokeStyle='rgba(0,0,0,.7)'; ctx.lineWidth=3; ctx.lineCap='round';
+    ctx.beginPath(); ctx.arc(cx, cy+12, 14, 0.15, Math.PI-0.15); ctx.stroke();
+    // Esquinas decorativas
+    [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([dx,dy])=>{
+      ctx.fillStyle=s;
+      roundRect(ctx, cx+dx*(sz-10)-dx*10, cy+dy*(sz-10)-dy*10, 12, 12, 3);
+      ctx.fill();
+    });
+
+  } else if(custState.type==='ship'){
+    ctx.shadowColor='rgba(0,0,0,.4)'; ctx.shadowBlur=10; ctx.shadowOffsetY=3;
+    ctx.fillStyle=p;
+    ctx.beginPath();
+    ctx.moveTo(cx-52, cy);
+    ctx.lineTo(cx-10, cy-30);
+    ctx.lineTo(cx+52, cy);
+    ctx.lineTo(cx-10, cy+30);
+    ctx.closePath(); ctx.fill();
+    ctx.shadowBlur=0; ctx.shadowOffsetY=0;
+    ctx.strokeStyle=darken(p,.7); ctx.lineWidth=2.5; ctx.stroke();
+    ctx.fillStyle=s;
+    ctx.beginPath();
+    ctx.moveTo(cx-30,cy); ctx.lineTo(cx,cy-18); ctx.lineTo(cx+30,cy); ctx.lineTo(cx,cy+18);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.9)';
+    ctx.beginPath(); ctx.arc(cx+4, cy-4, 7, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(0,0,0,.8)';
+    ctx.beginPath(); ctx.arc(cx+6, cy-4, 3.5, 0, Math.PI*2); ctx.fill();
+    // Motor
+    ctx.fillStyle=s;
+    ctx.beginPath(); ctx.moveTo(cx-52,cy); ctx.lineTo(cx-68,cy-10); ctx.lineTo(cx-65,cy); ctx.lineTo(cx-68,cy+10); ctx.closePath(); ctx.fill();
+
+  } else if(custState.type==='ball'){
+    const r = 52;
+    ctx.shadowColor='rgba(0,0,0,.4)'; ctx.shadowBlur=12; ctx.shadowOffsetY=4;
+    ctx.fillStyle=p;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur=0; ctx.shadowOffsetY=0;
+    ctx.strokeStyle=darken(p,.7); ctx.lineWidth=3;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.stroke();
+    ctx.fillStyle=s;
+    ctx.beginPath(); ctx.arc(cx, cy, r*0.62, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.18)';
+    ctx.beginPath(); ctx.ellipse(cx-10, cy-20, r*0.35, r*0.18, -0.4, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.9)';
+    ctx.beginPath(); ctx.arc(cx-14, cy-6, 9, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx+14, cy-6, 9, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(0,0,0,.8)';
+    ctx.beginPath(); ctx.arc(cx-12, cy-6, 4.5, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx+16, cy-6, 4.5, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle='rgba(0,0,0,.6)'; ctx.lineWidth=2.5; ctx.lineCap='round';
+    ctx.beginPath(); ctx.arc(cx, cy+10, 12, 0.15, Math.PI-0.15); ctx.stroke();
+  }
+}
+
+function roundRect(ctx, x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.lineTo(x+w-r, y); ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+  ctx.lineTo(x+w, y+h-r); ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+  ctx.lineTo(x+r, y+h); ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+  ctx.lineTo(x, y+r); ctx.quadraticCurveTo(x, y, x+r, y);
+  ctx.closePath();
+}
+
+function darken(hex, factor){
+  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  return `rgb(${~~(r*factor)},${~~(g*factor)},${~~(b*factor)})`;
+}
+
+function selectType(type, btn){
+  custState.type = type;
+  document.querySelectorAll('.cust-tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  drawPreview();
+}
+
+function saveCustomize(){
+  saveCustState();
+  // Flash visual de confirmación
+  const btn = document.getElementById('cust-save');
+  btn.textContent = '✓ ¡Guardado!';
+  btn.style.background = 'linear-gradient(155deg,#44aaff,#0066cc)';
+  setTimeout(()=>{
+    btn.textContent = '✓ Guardar';
+    btn.style.background = 'linear-gradient(155deg,#60d840,#38a018)';
+  }, 1200);
+}
+
+function goCustomize(){
+  loadCustState();
+  // Sync inputs
+  document.getElementById('custom-primary').value = custState.primary;
+  document.getElementById('custom-secondary').value = custState.secondary;
+  // Sync tab
+  document.querySelectorAll('.cust-tab').forEach(t=>{
+    t.classList.toggle('active', t.textContent.toLowerCase()===custState.type);
+  });
+  refreshPalettes();
+  showScreen('screen-customize');
+  drawPreview();
+}
+
+// Input de color custom — actualiza en tiempo real
+document.getElementById('custom-primary').addEventListener('input', e=>{
+  custState.primary = e.target.value;
+  refreshPalettes();
+  drawPreview();
+});
+document.getElementById('custom-secondary').addEventListener('input', e=>{
+  custState.secondary = e.target.value;
+  refreshPalettes();
+  drawPreview();
+});
+
+showScreen('screen-main');
+</script>
+</body>
+</html>
