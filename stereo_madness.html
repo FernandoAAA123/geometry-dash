@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Geometry Dash – Stereo Madness</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh;overflow:hidden;}
+
+/* ═══ PANTALLA JUEGO ═══ */
+#wrapper{position:relative;width:800px;height:450px;overflow:hidden;background:#000;}
+
+/* HUD superior */
+#hud{position:absolute;top:0;left:0;width:100%;height:40px;z-index:20;display:flex;align-items:center;padding:0 14px;gap:10px;pointer-events:none;}
+#hud-bar-bg{flex:1;height:10px;background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.15);border-radius:5px;overflow:hidden;}
+#hud-bar{height:100%;width:0%;background:linear-gradient(90deg,#00ccff,#0066ff);border-radius:5px;transition:width .05s;}
+#hud-pct{color:#fff;font-family:'Arial Black',Arial,sans-serif;font-size:11px;min-width:34px;text-align:right;text-shadow:0 1px 3px #000;}
+#hud-attempts{color:rgba(255,255,255,.5);font-family:Arial,sans-serif;font-size:10px;letter-spacing:1px;}
+
+/* Pause btn */
+#btn-pause{position:absolute;top:6px;right:10px;z-index:30;width:34px;height:34px;border:2px solid rgba(255,255,255,.3);border-radius:50%;background:rgba(0,0,0,.5);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:3px;}
+#btn-pause span{display:block;width:4px;height:14px;background:#fff;border-radius:2px;}
+
+/* Canvas */
+#c{display:block;position:absolute;top:40px;left:0;}
+
+/* Barra progreso abajo */
+#prog-wrap{position:absolute;bottom:0;left:0;width:100%;height:5px;background:rgba(255,255,255,.05);}
+#prog-bar{height:100%;width:0%;background:#00ccff;}
+
+/* ═══ OVERLAY PAUSA / MUERTE / WIN ═══ */
+#overlay{position:absolute;inset:0;z-index:50;display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;background:rgba(0,0,0,.75);}
+#overlay.show{display:flex;}
+#ov-title{font-family:'Arial Black',Arial,sans-serif;font-size:28px;letter-spacing:3px;color:#fff;}
+#ov-sub{font-family:Arial,sans-serif;font-size:13px;color:rgba(255,255,255,.5);letter-spacing:2px;}
+#ov-stars{display:flex;gap:8px;font-size:30px;}
+.ov-btn{padding:10px 32px;font-family:'Arial Black',Arial,sans-serif;font-size:13px;letter-spacing:2px;border:none;border-radius:6px;cursor:pointer;}
+.ov-btn:active{transform:scale(.96);}
+#ov-btns{display:flex;gap:10px;margin-top:4px;}
+</style>
+</head>
+<body>
+
+<div id="wrapper">
+  <!-- HUD -->
+  <div id="hud">
+    <div id="hud-bar-bg"><div id="hud-bar"></div></div>
+    <span id="hud-pct">0%</span>
+    <span id="hud-attempts">Attempt 1</span>
+  </div>
+  <div id="btn-pause"><span></span><span></span></div>
+
+  <!-- CANVAS (H=410 = wrapper 450 - hud 40) -->
+  <canvas id="c" width="800" height="410"></canvas>
+
+  <div id="prog-wrap"><div id="prog-bar"></div></div>
+
+  <!-- OVERLAY -->
+  <div id="overlay">
+    <div id="ov-title">STEREO MADNESS</div>
+    <div id="ov-sub" id="ov-sub">PRESIONA ESPACIO O CLIC PARA JUGAR</div>
+    <div id="ov-stars"><span style="color:#ffdd00">★</span><span style="color:#333">★</span><span style="color:#333">★</span></div>
+    <div id="ov-btns">
+      <button class="ov-btn" id="ov-play" style="background:#ffdd00;color:#1a1000;">▶ JUGAR</button>
+      <button class="ov-btn" id="ov-menu" style="background:#333;color:#fff;display:none;">☰ MENÚ</button>
+    </div>
+    <div id="ov-hint" style="font-family:Arial,sans-serif;font-size:10px;color:rgba(255,255,255,.3);letter-spacing:2px;margin-top:4px;">ESPACIO · CLIC · TOQUE</div>
+  </div>
+</div>
+
+<!-- MÚSICA -->
+<audio id="audio" loop crossorigin="anonymous">
+  <source src="https://archive.org/download/stereo-madness/StereoMadness.mp3" type="audio/mpeg">
+</audio>
+
+<script>
+/* ════════════════════════════════════════════════
+   GEOMETRY DASH — STEREO MADNESS
+   Nivel recreado con datos fieles del juego original
+   ════════════════════════════════════════════════ */
+
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+const W = 800, H = 410;
+
+// ── AUDIO ──
+const audio = document.getElementById('audio');
+audio.volume = 0.7;
+
+// ── IMÁGENES ──
+function img(src){ const i=new Image(); i.src=src; return i; }
+const IMG = {
+  cube:       img('https://chibi.iitranq.co.uk/D6ovF0S02Xu0.png'),
+  spike01:    img('https://chibi.iitranq.co.uk/egdob0FnJl6h.png'),
+  spike02:    img('https://chibi.iitranq.co.uk/oupudeTk0xRc.png'),
+  block01:    img('https://chibi.iitranq.co.uk/swO1GGuYacJB.png'),
+  block02:    img('https://chibi.iitranq.co.uk/MSZmCPjzIcg2.png'),
+  pit06:      img('https://chibi.iitranq.co.uk/XJ2Wv5vhQoBK.png'),
+  half_block: img('https://chibi.iitranq.co.uk/COD7utvgFHmS.png'),
+  ship_portal:img('https://chibi.iitranq.co.uk/zsBwxhzqdRTy.png'),
+};
+
+// ── CONSTANTES FÍSICAS ──
+const TILE      = 44;
+const GROUND_Y  = H - 90;
+const SPEED     = 5.8;
+const GRAVITY   = 0.54;
+const JUMP_V    = -12.8;   // salto ligeramente más potente
+const SHIP_GRAV = 0.28;
+const SHIP_UP   = -0.55;
+
+// Tamaños naturales de cada sprite (ancho, alto en px)
+// Se usan para dibujar SIN estirar la imagen
+const SPRITE_SIZE = {
+  cube:        [44, 44],
+  spike01:     [44, 44],
+  spike02:     [44, 44],
+  block01:     [44, 44],
+  block02:     [44, 44],
+  pit06:       [44, 44],
+  half_block:  [44, 22],
+  ship_portal: [54, 88],
+};
+
+// ── DATOS DEL NIVEL ──
+// yOffset en los datos = distancia desde el suelo hacia arriba en px
+// Convertimos: drawY = GROUND_Y - TILE - yOffset
+const LEVEL_RAW = [
+    { x: 924,  tipo: 'spike01' },
+    { x: 1584, tipo: 'spike02' },
+    { x: 1628, tipo: 'spike01' },
+    { x: 2244, tipo: 'spike01' },
+    { x: 2288, tipo: 'spike01' },
+    { x: 2332, tipo: 'block01' },
+    { x: 2376, tipo: 'pit06' },
+    { x: 2420, tipo: 'pit06' },
+    { x: 2464, tipo: 'pit06' },
+    { x: 2508, tipo: 'block01' },
+    { x: 2508, tipo: 'block01', yOffset: 44 },
+    { x: 2552, tipo: 'pit06' },
+    { x: 2596, tipo: 'pit06' },
+    { x: 2640, tipo: 'pit06' },
+    { x: 2684, tipo: 'block01' },
+    { x: 2684, tipo: 'block01', yOffset: 44 },
+    { x: 2684, tipo: 'block01', yOffset: 88 },
+    { x: 3608, tipo: 'spike01' },
+    { x: 3652, tipo: 'spike01' },
+    { x: 3916, tipo: 'block01' },
+    { x: 3960, tipo: 'block01' },
+    { x: 4004, tipo: 'block01' },
+    { x: 4048, tipo: 'block01' },
+    { x: 4092, tipo: 'block01' },
+    { x: 4136, tipo: 'block01' },
+    { x: 4180, tipo: 'block01' },
+    { x: 4224, tipo: 'block01' },
+    { x: 4268, tipo: 'pit06' },
+    { x: 4312, tipo: 'pit06' },
+    { x: 4356, tipo: 'pit06' },
+    { x: 4400, tipo: 'block01' },
+    { x: 4444, tipo: 'block01' },
+    { x: 4488, tipo: 'block01' },
+    { x: 4532, tipo: 'block01' },
+    { x: 4576, tipo: 'block01' },
+    { x: 4620, tipo: 'block01' },
+    { x: 4620, tipo: 'spike01', yOffset: 44 },
+    { x: 4664, tipo: 'block01' },
+    { x: 4708, tipo: 'block01' },
+    { x: 4752, tipo: 'block01' },
+    { x: 4796, tipo: 'block01' },
+    { x: 4840, tipo: 'block01' },
+    { x: 4884, tipo: 'pit06' },
+    { x: 4928, tipo: 'pit06' },
+    { x: 4972, tipo: 'pit06' },
+    { x: 5016, tipo: 'block01', yOffset: 44 },
+    { x: 5016, tipo: 'block01' },
+    { x: 5060, tipo: 'block01', yOffset: 44 },
+    { x: 5060, tipo: 'block01' },
+    { x: 5104, tipo: 'block01' },
+    { x: 5104, tipo: 'block01', yOffset: 44 },
+    { x: 5148, tipo: 'block01', yOffset: 44 },
+    { x: 5148, tipo: 'block01' },
+    { x: 5192, tipo: 'block01' },
+    { x: 5192, tipo: 'block01', yOffset: 44 },
+    { x: 5236, tipo: 'block01', yOffset: 44 },
+    { x: 5236, tipo: 'block01' },
+    { x: 5280, tipo: 'block01', yOffset: 44 },
+    { x: 5280, tipo: 'block01' },
+    { x: 5324, tipo: 'block01', yOffset: 44 },
+    { x: 5324, tipo: 'block01' },
+    { x: 5324, tipo: 'spike01', yOffset: 88 },
+    { x: 5368, tipo: 'block01', yOffset: 44 },
+    { x: 5368, tipo: 'block01' },
+    { x: 5412, tipo: 'block01', yOffset: 44 },
+    { x: 5412, tipo: 'block01' },
+    { x: 5456, tipo: 'block01', yOffset: 44 },
+    { x: 5456, tipo: 'block01' },
+    { x: 5500, tipo: 'block01', yOffset: 44 },
+    { x: 5500, tipo: 'block01' },
+    { x: 5544, tipo: 'block01', yOffset: 44 },
+    { x: 5544, tipo: 'block01' },
+    { x: 5588, tipo: 'block01', yOffset: 44 },
+    { x: 5588, tipo: 'block01' },
+    { x: 5632, tipo: 'pit06' },
+    { x: 5676, tipo: 'pit06' },
+    { x: 5720, tipo: 'pit06' },
+    { x: 5764, tipo: 'pit06' },
+    { x: 5764, tipo: 'half_block', yOffset: 308 },
+    { x: 5808, tipo: 'pit06' },
+    { x: 5852, tipo: 'pit06' },
+    { x: 5896, tipo: 'pit06' },
+    { x: 5940, tipo: 'half_block', yOffset: 264 },
+    { x: 5940, tipo: 'pit06' },
+    { x: 5984, tipo: 'pit06' },
+    { x: 6028, tipo: 'pit06' },
+    { x: 6072, tipo: 'pit06' },
+    { x: 6116, tipo: 'half_block', yOffset: 220 },
+    { x: 6116, tipo: 'pit06' },
+    { x: 6160, tipo: 'pit06' },
+    { x: 6204, tipo: 'pit06' },
+    { x: 6248, tipo: 'pit06' },
+    { x: 6292, tipo: 'half_block', yOffset: 176 },
+    { x: 6292, tipo: 'pit06' },
+    { x: 6336, tipo: 'pit06' },
+    { x: 6380, tipo: 'pit06' },
+    { x: 6424, tipo: 'pit06' },
+    { x: 6468, tipo: 'half_block', yOffset: 132 },
+    { x: 6468, tipo: 'pit06' },
+    { x: 6644, tipo: 'block02', yOffset: 220 },
+    { x: 6688, tipo: 'block02', yOffset: 220 },
+    { x: 6732, tipo: 'block02', yOffset: 176 },
+    { x: 6732, tipo: 'block02', yOffset: 220 },
+    { x: 6732, tipo: 'block02', yOffset: 132 },
+    { x: 6732, tipo: 'block02', yOffset: 88 },
+    { x: 6732, tipo: 'block02', yOffset: 44 },
+    { x: 6732, tipo: 'block02' },
+    { x: 6776, tipo: 'block02', yOffset: 176 },
+    { x: 6776, tipo: 'block02', yOffset: 220 },
+    { x: 6776, tipo: 'block02', yOffset: 132 },
+    { x: 6776, tipo: 'block02', yOffset: 88 },
+    { x: 6776, tipo: 'block02' },
+    { x: 6776, tipo: 'block02', yOffset: 44 },
+    { x: 6820, tipo: 'block02', yOffset: 176 },
+    { x: 6820, tipo: 'block02', yOffset: 220 },
+    { x: 6820, tipo: 'block02', yOffset: 132 },
+    { x: 6820, tipo: 'block02', yOffset: 88 },
+    { x: 6820, tipo: 'block02' },
+    { x: 6820, tipo: 'block02', yOffset: 44 },
+    { x: 6864, tipo: 'block02', yOffset: 176 },
+    { x: 6864, tipo: 'block02', yOffset: 220 },
+    { x: 6864, tipo: 'block02', yOffset: 132 },
+    { x: 6864, tipo: 'block02', yOffset: 88 },
+    { x: 6864, tipo: 'block02', yOffset: 44 },
+    { x: 6864, tipo: 'block02' },
+    { x: 6908, tipo: 'block02', yOffset: 220 },
+    { x: 6908, tipo: 'block02', yOffset: 176 },
+    { x: 6908, tipo: 'block02', yOffset: 132 },
+    { x: 6908, tipo: 'block02', yOffset: 88 },
+    { x: 6908, tipo: 'block02', yOffset: 44 },
+    { x: 6908, tipo: 'block02' },
+    { x: 6908, tipo: 'spike01', yOffset: 264 },
+    { x: 6952, tipo: 'block02', yOffset: 176 },
+    { x: 6952, tipo: 'block02', yOffset: 220 },
+    { x: 6952, tipo: 'block02', yOffset: 132 },
+    { x: 6952, tipo: 'block02' },
+    { x: 6952, tipo: 'spike01', yOffset: 264 },
+    { x: 6952, tipo: 'half_block', yOffset: 88 },
+    { x: 6952, tipo: 'block02', yOffset: 44 },
+    { x: 6996, tipo: 'spike01', yOffset: 264 },
+    { x: 6996, tipo: 'block02', yOffset: 220 },
+    { x: 6996, tipo: 'block02', yOffset: 176 },
+    { x: 6996, tipo: 'block02', yOffset: 132 },
+    { x: 6996, tipo: 'block02', yOffset: 44 },
+    { x: 6996, tipo: 'block02' },
+    { x: 6996, tipo: 'half_block', yOffset: 88 },
+    { x: 7040, tipo: 'spike01', yOffset: 264 },
+    { x: 7040, tipo: 'block02' },
+    { x: 7040, tipo: 'block02', yOffset: 44 },
+    { x: 7040, tipo: 'block02', yOffset: 88 },
+    { x: 7040, tipo: 'block02', yOffset: 176 },
+    { x: 7040, tipo: 'block02', yOffset: 132 },
+    { x: 7040, tipo: 'block02', yOffset: 220 },
+    { x: 7084, tipo: 'block02', yOffset: 220 },
+    { x: 7084, tipo: 'block02', yOffset: 176 },
+    { x: 7084, tipo: 'block02', yOffset: 132 },
+    { x: 7084, tipo: 'block02', yOffset: 88 },
+    { x: 7084, tipo: 'block02', yOffset: 44 },
+    { x: 7084, tipo: 'block02' },
+    { x: 7128, tipo: 'block02', yOffset: 220 },
+    { x: 7128, tipo: 'block02', yOffset: 176 },
+    { x: 7128, tipo: 'block02', yOffset: 132 },
+    { x: 7128, tipo: 'block02' },
+    { x: 7128, tipo: 'block02', yOffset: 44 },
+    { x: 7128, tipo: 'block02', yOffset: 88 },
+    { x: 7172, tipo: 'block02', yOffset: 220 },
+    { x: 7172, tipo: 'block02', yOffset: 176 },
+    { x: 7172, tipo: 'block02', yOffset: 132 },
+    { x: 7172, tipo: 'block02', yOffset: 88 },
+    { x: 7172, tipo: 'block02', yOffset: 44 },
+    { x: 7172, tipo: 'block02' },
+    { x: 7216, tipo: 'block02', yOffset: 220 },
+    { x: 7216, tipo: 'block02', yOffset: 176 },
+    { x: 7216, tipo: 'block02', yOffset: 132 },
+    { x: 7216, tipo: 'block02', yOffset: 88 },
+    { x: 7216, tipo: 'block02', yOffset: 44 },
+    { x: 7216, tipo: 'block02' },
+    { x: 7260, tipo: 'spike01', yOffset: 264 },
+    { x: 7260, tipo: 'block02', yOffset: 176 },
+    { x: 7260, tipo: 'block02', yOffset: 220 },
+    { x: 7260, tipo: 'block02', yOffset: 132 },
+    { x: 7260, tipo: 'block02', yOffset: 88 },
+    { x: 7260, tipo: 'block02', yOffset: 44 },
+    { x: 7260, tipo: 'block02' },
+    { x: 7304, tipo: 'spike01', yOffset: 264 },
+    { x: 7304, tipo: 'block02', yOffset: 176 },
+    { x: 7304, tipo: 'block02', yOffset: 220 },
+    { x: 7304, tipo: 'block02', yOffset: 132 },
+    { x: 7304, tipo: 'block02', yOffset: 44 },
+    { x: 7304, tipo: 'block02' },
+    { x: 7304, tipo: 'half_block', yOffset: 88 },
+    { x: 7348, tipo: 'spike01', yOffset: 264 },
+    { x: 7348, tipo: 'block02', yOffset: 176 },
+    { x: 7348, tipo: 'block02', yOffset: 220 },
+    { x: 7348, tipo: 'block02', yOffset: 132 },
+    { x: 7348, tipo: 'block02' },
+    { x: 7348, tipo: 'block02', yOffset: 44 },
+    { x: 7348, tipo: 'half_block', yOffset: 88 },
+    { x: 7392, tipo: 'spike01', yOffset: 264 },
+    { x: 7392, tipo: 'block02', yOffset: 176 },
+    { x: 7392, tipo: 'block02', yOffset: 220 },
+    { x: 7392, tipo: 'block02', yOffset: 88 },
+    { x: 7392, tipo: 'block02', yOffset: 132 },
+    { x: 7392, tipo: 'block02', yOffset: 44 },
+    { x: 7392, tipo: 'block02' },
+    { x: 7436, tipo: 'block02', yOffset: 220 },
+    { x: 7436, tipo: 'block02', yOffset: 176 },
+    { x: 7436, tipo: 'block02', yOffset: 132 },
+    { x: 7436, tipo: 'block02', yOffset: 88 },
+    { x: 7436, tipo: 'block02', yOffset: 44 },
+    { x: 7436, tipo: 'block02' },
+    { x: 7480, tipo: 'block02', yOffset: 220 },
+    { x: 7480, tipo: 'block02', yOffset: 176 },
+    { x: 7480, tipo: 'block02' },
+    { x: 7480, tipo: 'block02', yOffset: 44 },
+    { x: 7480, tipo: 'block02', yOffset: 88 },
+    { x: 7480, tipo: 'block02', yOffset: 132 },
+    { x: 7524, tipo: 'block02', yOffset: 220 },
+    { x: 7524, tipo: 'block02', yOffset: 176 },
+    { x: 7524, tipo: 'block02', yOffset: 132 },
+    { x: 7524, tipo: 'block02', yOffset: 88 },
+    { x: 7524, tipo: 'block02', yOffset: 44 },
+    { x: 7524, tipo: 'block02' },
+    { x: 7568, tipo: 'block02', yOffset: 220 },
+    { x: 7568, tipo: 'block02', yOffset: 176 },
+    { x: 7568, tipo: 'block02', yOffset: 132 },
+    { x: 7568, tipo: 'block02', yOffset: 88 },
+    { x: 7568, tipo: 'block02', yOffset: 44 },
+    { x: 7568, tipo: 'block02' },
+    { x: 7612, tipo: 'block02', yOffset: 176 },
+    { x: 7612, tipo: 'block02', yOffset: 132 },
+    { x: 7612, tipo: 'block02', yOffset: 88 },
+    { x: 7612, tipo: 'block02', yOffset: 44 },
+    { x: 7612, tipo: 'block02' },
+    { x: 7656, tipo: 'block02', yOffset: 176 },
+    { x: 7656, tipo: 'block02' },
+    { x: 7656, tipo: 'block02', yOffset: 44 },
+    { x: 7656, tipo: 'block02', yOffset: 88 },
+    { x: 7656, tipo: 'block02', yOffset: 132 },
+    { x: 7700, tipo: 'block02', yOffset: 176 },
+    { x: 7700, tipo: 'block02', yOffset: 132 },
+    { x: 7700, tipo: 'block02', yOffset: 88 },
+    { x: 7700, tipo: 'block02', yOffset: 44 },
+    { x: 7700, tipo: 'block02' },
+    { x: 7744, tipo: 'block02', yOffset: 176 },
+    { x: 7744, tipo: 'block02' },
+    { x: 7744, tipo: 'block02', yOffset: 44 },
+    { x: 7744, tipo: 'block02', yOffset: 132 },
+    { x: 7744, tipo: 'spike01', yOffset: 308 },
+    { x: 7744, tipo: 'half_block', yOffset: 88 },
+    { x: 7788, tipo: 'block02', yOffset: 176 },
+    { x: 7788, tipo: 'block02', yOffset: 132 },
+    { x: 7788, tipo: 'block02', yOffset: 44 },
+    { x: 7788, tipo: 'block02' },
+    { x: 7788, tipo: 'spike01', yOffset: 308 },
+    { x: 7788, tipo: 'half_block', yOffset: 88 },
+    { x: 7832, tipo: 'block02', yOffset: 176 },
+    { x: 7832, tipo: 'block02', yOffset: 132 },
+    { x: 7832, tipo: 'block02', yOffset: 44 },
+    { x: 7832, tipo: 'block02' },
+    { x: 7832, tipo: 'spike01', yOffset: 308 },
+    { x: 7832, tipo: 'half_block', yOffset: 88 },
+    { x: 7876, tipo: 'block02', yOffset: 176 },
+    { x: 7876, tipo: 'block02', yOffset: 132 },
+    { x: 7876, tipo: 'block02', yOffset: 44 },
+    { x: 7876, tipo: 'block02' },
+    { x: 7876, tipo: 'spike01', yOffset: 308 },
+    { x: 7876, tipo: 'half_block', yOffset: 88 },
+    { x: 7920, tipo: 'block02', yOffset: 176 },
+    { x: 7920, tipo: 'block02', yOffset: 132 },
+    { x: 7920, tipo: 'block02', yOffset: 44 },
+    { x: 7920, tipo: 'block02', yOffset: 88 },
+    { x: 7920, tipo: 'block02' },
+    { x: 7964, tipo: 'block02', yOffset: 176 },
+    { x: 7964, tipo: 'block02', yOffset: 88 },
+    { x: 7964, tipo: 'block02', yOffset: 132 },
+    { x: 7964, tipo: 'block02', yOffset: 44 },
+    { x: 7964, tipo: 'block02' },
+    { x: 8008, tipo: 'block02', yOffset: 176 },
+    { x: 8008, tipo: 'block02', yOffset: 44 },
+    { x: 8008, tipo: 'block02', yOffset: 132 },
+    { x: 8008, tipo: 'block02', yOffset: 88 },
+    { x: 8008, tipo: 'block02' },
+    { x: 8052, tipo: 'block02', yOffset: 220 },
+    { x: 8052, tipo: 'block02', yOffset: 176 },
+    { x: 8052, tipo: 'block02', yOffset: 132 },
+    { x: 8052, tipo: 'block02', yOffset: 88 },
+    { x: 8052, tipo: 'block02', yOffset: 44 },
+    { x: 8052, tipo: 'block02' },
+    { x: 8096, tipo: 'block02' },
+    { x: 8096, tipo: 'block02', yOffset: 44 },
+    { x: 8096, tipo: 'block02', yOffset: 88 },
+    { x: 8096, tipo: 'block02', yOffset: 132 },
+    { x: 8096, tipo: 'block02', yOffset: 176 },
+    { x: 8096, tipo: 'block02', yOffset: 220 },
+    { x: 8140, tipo: 'block02', yOffset: 220 },
+    { x: 8140, tipo: 'block02', yOffset: 176 },
+    { x: 8140, tipo: 'block02', yOffset: 132 },
+    { x: 8140, tipo: 'block02', yOffset: 88 },
+    { x: 8140, tipo: 'block02', yOffset: 44 },
+    { x: 8140, tipo: 'block02' },
+    { x: 8184, tipo: 'block02', yOffset: 220 },
+    { x: 8184, tipo: 'block02', yOffset: 176 },
+    { x: 8184, tipo: 'block02' },
+    { x: 8184, tipo: 'block02', yOffset: 44 },
+    { x: 8184, tipo: 'block02', yOffset: 88 },
+    { x: 8184, tipo: 'block02', yOffset: 132 },
+    { x: 8228, tipo: 'block02', yOffset: 220 },
+    { x: 8228, tipo: 'spike01', yOffset: 264 },
+    { x: 8228, tipo: 'block02', yOffset: 176 },
+    { x: 8228, tipo: 'block02', yOffset: 132 },
+    { x: 8228, tipo: 'block02', yOffset: 44 },
+    { x: 8228, tipo: 'block02', yOffset: 88 },
+    { x: 8228, tipo: 'block02' },
+    { x: 8272, tipo: 'spike01', yOffset: 176 },
+    { x: 8272, tipo: 'block02' },
+    { x: 8272, tipo: 'block02', yOffset: 44 },
+    { x: 8272, tipo: 'block02', yOffset: 88 },
+    { x: 8272, tipo: 'block02', yOffset: 132 },
+    { x: 8316, tipo: 'block02', yOffset: 132 },
+    { x: 8316, tipo: 'block02', yOffset: 88 },
+    { x: 8316, tipo: 'block02', yOffset: 44 },
+    { x: 8316, tipo: 'block02' },
+    { x: 8360, tipo: 'block02', yOffset: 132 },
+    { x: 8360, tipo: 'block02', yOffset: 88 },
+    { x: 8360, tipo: 'block02', yOffset: 44 },
+    { x: 8360, tipo: 'block02' },
+    { x: 8404, tipo: 'block02', yOffset: 132 },
+    { x: 8404, tipo: 'block02', yOffset: 88 },
+    { x: 8404, tipo: 'block02', yOffset: 44 },
+    { x: 8404, tipo: 'block02' },
+    { x: 8448, tipo: 'block02', yOffset: 132 },
+    { x: 8448, tipo: 'block02', yOffset: 88 },
+    { x: 8448, tipo: 'block02', yOffset: 44 },
+    { x: 8448, tipo: 'block02' },
+    { x: 8492, tipo: 'block02', yOffset: 132 },
+    { x: 8492, tipo: 'block02' },
+    { x: 8492, tipo: 'block02', yOffset: 44 },
+    { x: 8492, tipo: 'block02', yOffset: 88 },
+    { x: 8536, tipo: 'block02', yOffset: 132 },
+    { x: 8536, tipo: 'block02', yOffset: 88 },
+    { x: 8536, tipo: 'block02', yOffset: 44 },
+    { x: 8536, tipo: 'block02' },
+    { x: 8580, tipo: 'block02', yOffset: 132 },
+    { x: 8580, tipo: 'pit06' },
+    { x: 8624, tipo: 'block02', yOffset: 132 },
+    { x: 8624, tipo: 'pit06' },
+    { x: 8668, tipo: 'block02', yOffset: 132 },
+    { x: 8668, tipo: 'pit06' },
+    { x: 8712, tipo: 'block02', yOffset: 132 },
+    { x: 8712, tipo: 'pit06' },
+    { x: 8756, tipo: 'pit06' },
+    { x: 8800, tipo: 'pit06' },
+    { x: 8844, tipo: 'half_block', yOffset: 264 },
+    { x: 8844, tipo: 'pit06' },
+    { x: 8888, tipo: 'half_block', yOffset: 264 },
+    { x: 8888, tipo: 'pit06' },
+    { x: 8932, tipo: 'half_block', yOffset: 264 },
+    { x: 8932, tipo: 'pit06' },
+    { x: 8976, tipo: 'half_block', yOffset: 264 },
+    { x: 8976, tipo: 'spike01', yOffset: 132 },
+    { x: 8976, tipo: 'pit06' },
+    { x: 9020, tipo: 'pit06' },
+    { x: 9064, tipo: 'half_block', yOffset: 308 },
+    { x: 9064, tipo: 'pit06' },
+    { x: 9108, tipo: 'half_block', yOffset: 308 },
+    { x: 9108, tipo: 'pit06' },
+    { x: 9152, tipo: 'half_block', yOffset: 308 },
+    { x: 9152, tipo: 'pit06' },
+    { x: 9196, tipo: 'half_block', yOffset: 308 },
+    { x: 9196, tipo: 'pit06' },
+    { x: 9240, tipo: 'half_block', yOffset: 308 },
+    { x: 9240, tipo: 'pit06' },
+    { x: 9284, tipo: 'half_block', yOffset: 308 },
+    { x: 9284, tipo: 'pit06' },
+    { x: 9328, tipo: 'half_block', yOffset: 308 },
+    { x: 9328, tipo: 'spike01', yOffset: 88 },
+    { x: 9328, tipo: 'pit06' },
+    { x: 9372, tipo: 'pit06' },
+    { x: 9416, tipo: 'half_block', yOffset: 352 },
+    { x: 9416, tipo: 'pit06' },
+    { x: 9460, tipo: 'half_block', yOffset: 352 },
+    { x: 9460, tipo: 'pit06' },
+    { x: 9504, tipo: 'half_block', yOffset: 352 },
+    { x: 9504, tipo: 'pit06' },
+    { x: 9548, tipo: 'half_block', yOffset: 352 },
+    { x: 9548, tipo: 'pit06' },
+    { x: 9592, tipo: 'half_block', yOffset: 352 },
+    { x: 9592, tipo: 'pit06' },
+    { x: 9768, tipo: 'half_block', yOffset: 308 },
+    { x: 9944, tipo: 'half_block', yOffset: 264 },
+    { x: 9944, tipo: 'half_block', yOffset: 220 },
+    { x: 10120, tipo: 'half_block', yOffset: 264 },
+    { x: 10120, tipo: 'half_block', yOffset: 220 },
+    { x: 10296, tipo: 'half_block', yOffset: 176 },
+    { x: 10472, tipo: 'half_block', yOffset: 132 },
+    { x: 10516, tipo: 'block02', yOffset: 132 },
+    { x: 10560, tipo: 'block02', yOffset: 132 },
+    { x: 10604, tipo: 'block02', yOffset: 132 },
+    { x: 10648, tipo: 'half_block', yOffset: 88 },
+    { x: 10648, tipo: 'spike01', yOffset: 308 },
+    { x: 10648, tipo: 'block02', yOffset: 132 },
+    { x: 10692, tipo: 'block02', yOffset: 132 },
+    { x: 10736, tipo: 'block02', yOffset: 132 },
+    { x: 10780, tipo: 'block02', yOffset: 132 },
+    { x: 10824, tipo: 'block02', yOffset: 132 },
+    { x: 10824, tipo: 'block02', yOffset: 88 },
+    { x: 10824, tipo: 'block02', yOffset: 44 },
+    { x: 10824, tipo: 'block02' },
+    { x: 10868, tipo: 'block02' },
+    { x: 10868, tipo: 'block02', yOffset: 44 },
+    { x: 10868, tipo: 'block02', yOffset: 88 },
+    { x: 10868, tipo: 'block02', yOffset: 132 },
+    { x: 10912, tipo: 'block02', yOffset: 132 },
+    { x: 10912, tipo: 'block02', yOffset: 88 },
+    { x: 10912, tipo: 'block02', yOffset: 44 },
+    { x: 10912, tipo: 'block02' },
+    { x: 10956, tipo: 'block02', yOffset: 132 },
+    { x: 10956, tipo: 'block02', yOffset: 88 },
+    { x: 10956, tipo: 'block02', yOffset: 44 },
+    { x: 10956, tipo: 'block02' },
+    { x: 11000, tipo: 'block02', yOffset: 132 },
+    { x: 11000, tipo: 'block02', yOffset: 88 },
+    { x: 11000, tipo: 'block02' },
+    { x: 11000, tipo: 'block02', yOffset: 44 },
+    { x: 11044, tipo: 'block02', yOffset: 132 },
+    { x: 11044, tipo: 'block02', yOffset: 88 },
+    { x: 11044, tipo: 'block02' },
+    { x: 11044, tipo: 'block02', yOffset: 44 },
+    { x: 11088, tipo: 'block02', yOffset: 132 },
+    { x: 11088, tipo: 'block02', yOffset: 88 },
+    { x: 11088, tipo: 'block02' },
+    { x: 11088, tipo: 'block02', yOffset: 44 },
+    { x: 11132, tipo: 'block02', yOffset: 132 },
+    { x: 11132, tipo: 'block02', yOffset: 88 },
+    { x: 11132, tipo: 'block02', yOffset: 44 },
+    { x: 11132, tipo: 'block02' },
+    { x: 11176, tipo: 'block02', yOffset: 132 },
+    { x: 11176, tipo: 'block02', yOffset: 88 },
+    { x: 11176, tipo: 'block02' },
+    { x: 11176, tipo: 'block02', yOffset: 44 },
+    { x: 11220, tipo: 'block02', yOffset: 132 },
+    { x: 11220, tipo: 'block02', yOffset: 88 },
+    { x: 11220, tipo: 'block02', yOffset: 44 },
+    { x: 11220, tipo: 'block02' },
+    { x: 11264, tipo: 'block02', yOffset: 132 },
+    { x: 11264, tipo: 'block02' },
+    { x: 11264, tipo: 'block02', yOffset: 88 },
+    { x: 11264, tipo: 'block02', yOffset: 44 },
+    { x: 11308, tipo: 'block02', yOffset: 132 },
+    { x: 11308, tipo: 'block02', yOffset: 88 },
+    { x: 11308, tipo: 'block02' },
+    { x: 11308, tipo: 'block02', yOffset: 44 },
+    { x: 11352, tipo: 'block02', yOffset: 132 },
+    { x: 11352, tipo: 'block02' },
+    { x: 11352, tipo: 'block02', yOffset: 44 },
+    { x: 11352, tipo: 'block02', yOffset: 88 },
+    { x: 11396, tipo: 'block02', yOffset: 132 },
+    { x: 11396, tipo: 'block02', yOffset: 88 },
+    { x: 11396, tipo: 'block02' },
+    { x: 11396, tipo: 'block02', yOffset: 44 },
+    { x: 11440, tipo: 'block02', yOffset: 132 },
+    { x: 11440, tipo: 'block02' },
+    { x: 11440, tipo: 'block02', yOffset: 44 },
+    { x: 11440, tipo: 'block02', yOffset: 88 },
+    { x: 11484, tipo: 'block02', yOffset: 132 },
+    { x: 11484, tipo: 'block02', yOffset: 88 },
+    { x: 11484, tipo: 'block02', yOffset: 44 },
+    { x: 11484, tipo: 'block02' },
+    { x: 11528, tipo: 'block02', yOffset: 132 },
+    { x: 11528, tipo: 'block02', yOffset: 88 },
+    { x: 11528, tipo: 'block02' },
+    { x: 11528, tipo: 'block02', yOffset: 44 },
+    { x: 11572, tipo: 'block02', yOffset: 132 },
+    { x: 11572, tipo: 'block02' },
+    { x: 11572, tipo: 'block02', yOffset: 44 },
+    { x: 11572, tipo: 'block02', yOffset: 88 },
+    { x: 11616, tipo: 'block02', yOffset: 132 },
+    { x: 11616, tipo: 'block02', yOffset: 88 },
+    { x: 11616, tipo: 'block02', yOffset: 44 },
+    { x: 11616, tipo: 'block02' },
+    { x: 11660, tipo: 'block02', yOffset: 132 },
+    { x: 11660, tipo: 'block02' },
+    { x: 11660, tipo: 'block02', yOffset: 44 },
+    { x: 11660, tipo: 'block02', yOffset: 88 },
+    { x: 11704, tipo: 'block02', yOffset: 132 },
+    { x: 11704, tipo: 'block02', yOffset: 88 },
+    { x: 11704, tipo: 'block02', yOffset: 44 },
+    { x: 11704, tipo: 'block02' },
+    { x: 11748, tipo: 'block02', yOffset: 132 },
+    { x: 11748, tipo: 'block02' },
+    { x: 11748, tipo: 'block02', yOffset: 44 },
+    { x: 11748, tipo: 'block02', yOffset: 88 },
+    { x: 11792, tipo: 'block02', yOffset: 132 },
+    { x: 11792, tipo: 'ship_portal', yOffset: 176 },
+    { x: 11792, tipo: 'block02', yOffset: 88 },
+    { x: 11792, tipo: 'block02', yOffset: 44 },
+    { x: 11792, tipo: 'block02' }
+];
+
+// Límite del nivel (fin = último x + margen)
+const LEVEL_END = 12500;
+
+// ── PREPROCESAR NIVEL: calcular Y real en canvas ──
+// yOffset en los datos = distancia desde suelo hacia arriba (0 = en el suelo)
+// drawY = GROUND_Y - TILE - yOffset  (para bloques/spikes)
+// pit06 siempre va al suelo
+function makeTile(d) {
+  const yo   = d.yOffset || 0;
+  const tipo = d.tipo;
+  // Tamaño de hitbox (lógico) y de dibujo (visual, sin estirar)
+  const [sw, sh] = SPRITE_SIZE[tipo] || [TILE, TILE];
+  let drawY, hw, hh, deadly = false, solid = false, isPortal = false;
+
+  if (tipo === 'pit06') {
+    drawY = GROUND_Y - sh;   // siempre en el suelo
+    hw = sw; hh = sh;
+    deadly = true;
+  } else if (tipo === 'spike01' || tipo === 'spike02') {
+    drawY = GROUND_Y - sh - yo;
+    hw = sw; hh = sh;
+    deadly = true;
+  } else if (tipo === 'block01' || tipo === 'block02') {
+    drawY = GROUND_Y - sh - yo;
+    hw = sw; hh = sh;
+    solid = true;
+  } else if (tipo === 'half_block') {
+    drawY = GROUND_Y - sh - yo;
+    hw = sw; hh = sh;
+    solid = true;
+  } else if (tipo === 'ship_portal') {
+    drawY = GROUND_Y - sh - yo;
+    hw = sw; hh = sh;
+    isPortal = true;
+  } else {
+    drawY = GROUND_Y - sh - yo;
+    hw = sw; hh = sh;
+  }
+
+  return { x: d.x, drawY, w: hw, h: hh, sw, sh, tipo, deadly, solid, isPortal };
+}
+
+const LEVEL = LEVEL_RAW.map(makeTile);
+
+// ── FONDO: gradiente de color según progreso ──
+// 0%→25% azul oscuro, 25%→50% púrpura, 50%→75% azul medio, 75%→100% azul claro
+const BG_STOPS = [
+  [0,    [0,  18, 48]],
+  [0.25, [15, 0,  50]],
+  [0.50, [5,  12, 45]],
+  [0.75, [0,  20, 60]],
+  [1.00, [0,  26, 70]],
+];
+function bgColor(p) {
+  for (let i = 0; i < BG_STOPS.length - 1; i++) {
+    const [p0, c0] = BG_STOPS[i], [p1, c1] = BG_STOPS[i+1];
+    if (p >= p0 && p <= p1) {
+      const t = (p - p0) / (p1 - p0);
+      return `rgb(${~~(c0[0]+(c1[0]-c0[0])*t)},${~~(c0[1]+(c1[1]-c0[1])*t)},${~~(c0[2]+(c1[2]-c0[2])*t)})`;
+    }
+  }
+  return 'rgb(0,20,60)';
+}
+
+// ── ESTADO DEL JUEGO ──
+let attempt = 1;
+let gameRunning = false;
+let paused = false;
+let RAF = null;
+
+const G = {
+  wx: 200, py: GROUND_Y, pvy: 0, angle: 0,
+  onGround: false, alive: true, won: false,
+  mode: 'cube',
+  svy: 0,
+  particles: [],
+};
+let deathTimer = 0;   // frames desde la muerte, separado de G
+
+const PLAYER_SCR = 200; // X fija del jugador en pantalla
+
+function resetG() {
+  G.wx = 200; G.py = GROUND_Y; G.pvy = 0; G.angle = 0;
+  G.onGround = false; G.alive = true; G.won = false;
+  G.mode = 'cube'; G.svy = 0; G.particles = [];
+  deathTimer = 0;
+  attempt++;
+  updateHUD();
+}
+
+// ── INPUT ──
+let held = false, justPressed = false;
+
+window.addEventListener('keydown', e => {
+  if (e.code === 'Space' || e.code === 'ArrowUp') {
+    e.preventDefault();
+    if (!held) justPressed = true;
+    held = true;
+    if (!gameRunning) startGame();
+  }
+  if (e.code === 'Escape') togglePause();
+});
+window.addEventListener('keyup', e => {
+  if (e.code === 'Space' || e.code === 'ArrowUp') held = false;
+});
+canvas.addEventListener('mousedown', () => { justPressed = true; held = true; if (!gameRunning) startGame(); });
+canvas.addEventListener('mouseup', () => { held = false; });
+canvas.addEventListener('touchstart', e => { e.preventDefault(); justPressed = true; held = true; if (!gameRunning) startGame(); }, { passive: false });
+canvas.addEventListener('touchend', e => { e.preventDefault(); held = false; }, { passive: false });
+
+// ── PARTÍCULAS ──
+function spawnParticles(x, y) {
+  const cols = ['#ffdd00','#ff8800','#ff4400','#fff','#00ccff'];
+  for (let i = 0; i < 18; i++) {
+    const a = Math.random() * Math.PI * 2, sp = 1.5 + Math.random() * 5;
+    G.particles.push({ x, y, vx: Math.cos(a)*sp, vy: Math.sin(a)*sp - 2,
+      life: 40, max: 40, c: cols[i % cols.length], s: 3 + Math.random()*4 });
+  }
+}
+
+// ── COLISIONES ──
+function checkCollisions() {
+  const HB = 18; // half-size hitbox cubo
+  const wx  = G.wx;
+  const pL  = wx - HB, pR = wx + HB;
+  const pT  = G.py - TILE + 4, pB = G.py - 2;
+
+  for (const o of LEVEL) {
+    if (o.x + o.w < pL - 4 || o.x > pR + 4) continue;
+    const oT = o.drawY, oB = o.drawY + o.h;
+    if (pB <= oT || pT >= oB) continue;
+    if (pR <= o.x || pL >= o.x + o.w) continue;
+
+    if (o.isPortal) {
+      // Activar modo nave al tocar el portal
+      G.mode = 'ship'; G.svy = 0;
+      continue;
+    }
+    if (o.deadly) {
+      // Hitbox interno para spikes (más permisivo)
+      const pad = 8;
+      if (pR - pad > o.x + pad && pL + pad < o.x + o.w - pad &&
+          pB - pad > oT + pad) {
+        return true; // muerto
+      }
+    }
+    if (o.solid) {
+      // ¿Venimos de arriba?
+      const prevB = G.py - G.pvy;
+      if (prevB - 2 <= oT + 6 && G.pvy >= 0) {
+        G.py = oT; G.pvy = 0; G.onGround = true;
+        G.angle = Math.round(G.angle / 90) * 90;
+      } else {
+        return true; // choque lateral = muerte
+      }
+    }
+  }
+  return false;
+}
+
+function checkShipCollisions() {
+  const HB = 14;
+  const wx = G.wx;
+  const pL = wx - HB, pR = wx + HB;
+  const pT = G.py - HB, pB = G.py + HB;
+
+  for (const o of LEVEL) {
+    if (o.x + o.w < pL - 4 || o.x > pR + 4) continue;
+    const oT = o.drawY, oB = o.drawY + o.h;
+    if (pB <= oT || pT >= oB) continue;
+    if (pR <= o.x || pL >= o.x + o.w) continue;
+    if (o.isPortal) continue;
+    if (o.solid || o.deadly) return true;
+  }
+  return false;
+}
+
+// ── UPDATE ──
+function update() {
+  if (!G.alive || G.won || paused) return;
+
+  G.wx += SPEED;
+
+  // ¿Llegamos al final?
+  if (G.wx >= LEVEL_END) { G.won = true; return; }
+
+  if (G.mode === 'cube') {
+    G.pvy += GRAVITY;
+    G.py  += G.pvy;
+    G.onGround = false;
+
+    // Suelo
+    if (G.py >= GROUND_Y) {
+      G.py = GROUND_Y; G.pvy = 0; G.onGround = true;
+      G.angle = Math.round(G.angle / 90) * 90;
+    }
+    // Techo
+    if (G.py - TILE < 0) { die(); return; }
+
+    if (checkCollisions()) { die(); return; }
+
+    if (!G.onGround) G.angle = (G.angle + 8.5) % 360;
+    // Salto: responde a justPressed O a held si estamos en suelo
+    if ((justPressed || held) && G.onGround) {
+      G.pvy = JUMP_V;
+      G.onGround = false;
+      justPressed = false;
+    }
+
+  } else {
+    // NAVE
+    if (held) G.svy += SHIP_UP; else G.svy += SHIP_GRAV;
+    G.svy = Math.max(-9, Math.min(8, G.svy));
+    G.py += G.svy;
+    G.angle = Math.max(-30, Math.min(30, G.svy * 3.5));
+
+    // Límites nave
+    if (G.py >= GROUND_Y)       { die(); return; }
+    if (G.py <= 10)              { die(); return; }
+    if (checkShipCollisions())   { die(); return; }
+  }
+
+  justPressed = false;
+
+  // Partículas
+  G.particles.forEach(p => { p.x += p.vx; p.y += p.vy; p.vy += 0.2; p.life--; });
+  G.particles = G.particles.filter(p => p.life > 0);
+
+  updateHUD();
+}
+
+function die() {
+  if (!G.alive) return;  // evitar doble muerte
+  G.alive = false;
+  deathTimer = 0;
+  spawnParticles(PLAYER_SCR, G.py - TILE / 2);
+}
+
+// ── RENDER ──
+function drawGrid(camX) {
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+  ctx.lineWidth = 1;
+  const ox = ((TILE - (camX % TILE)) % TILE);
+  for (let x = ox; x < W; x += TILE) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, GROUND_Y); ctx.stroke(); }
+  for (let y = 0; y < GROUND_Y; y += TILE) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+}
+
+function drawCube(cx, cy, ang) {
+  if (!IMG.cube.complete || IMG.cube.naturalWidth === 0) {
+    // Fallback cuadrado amarillo
+    ctx.save(); ctx.translate(cx, cy - TILE/2); ctx.rotate(ang * Math.PI / 180);
+    ctx.fillStyle = '#ffdd00'; ctx.fillRect(-TILE/2, -TILE/2, TILE, TILE);
+    ctx.restore(); return;
+  }
+  ctx.save();
+  ctx.translate(cx, cy - TILE / 2);
+  ctx.rotate(ang * Math.PI / 180);
+  ctx.drawImage(IMG.cube, -TILE / 2, -TILE / 2, TILE, TILE);
+  ctx.restore();
+}
+
+function drawShip(cx, cy, ang, thrust) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(ang * Math.PI / 180);
+  // Motor
+  if (thrust) {
+    ctx.fillStyle = '#ff8800';
+    ctx.beginPath(); ctx.moveTo(-20,0); ctx.lineTo(-36,-7); ctx.lineTo(-32,0); ctx.lineTo(-36,7); ctx.closePath(); ctx.fill();
+  }
+  ctx.fillStyle = '#00ccff';
+  ctx.beginPath(); ctx.moveTo(-20,0); ctx.lineTo(-5,-16); ctx.lineTo(24,0); ctx.lineTo(-5,16); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#88eeff'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-1,-2,4,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+function render() {
+  const camX = G.wx - PLAYER_SCR;
+  const pct  = Math.min(1, G.wx / LEVEL_END);
+
+  // Fondo
+  ctx.fillStyle = bgColor(pct); ctx.fillRect(0, 0, W, H);
+
+  // Grid
+  drawGrid(camX);
+
+  // Suelo
+  ctx.fillStyle = '#05050d'; ctx.fillRect(0, GROUND_Y, W, H - GROUND_Y);
+  // Línea suelo brillante (estilo GD)
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, GROUND_Y); ctx.lineTo(W, GROUND_Y); ctx.stroke();
+
+  // En modo nave: techo
+  if (G.mode === 'ship') {
+    ctx.fillStyle = '#05050d'; ctx.fillRect(0, 0, W, 10);
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0, 10); ctx.lineTo(W, 10); ctx.stroke();
+  }
+
+  // Obstáculos
+  for (const o of LEVEL) {
+    const sx = o.x - camX;
+    if (sx + o.w < -10 || sx > W + 10) continue;
+    const dy = o.drawY;
+    const image = IMG[o.tipo];
+    if (image && image.complete && image.naturalWidth > 0) {
+      ctx.drawImage(image, sx, dy, o.w, o.h);
+    } else {
+      // Fallback colored rect
+      ctx.fillStyle = o.deadly ? '#ff4400' : o.isPortal ? '#cc44ff' : '#4488aa';
+      ctx.fillRect(sx, dy, o.w, o.h);
+    }
+  }
+
+  // Jugador
+  if (G.alive || G.particles.length > 0) {
+    if (G.mode === 'cube') drawCube(PLAYER_SCR, G.py, G.angle);
+    else drawShip(PLAYER_SCR, G.py - TILE/4, G.angle, held);
+  }
+
+  // Partículas
+  ctx.save();
+  for (const p of G.particles) {
+    ctx.globalAlpha = p.life / p.max;
+    ctx.fillStyle = p.c;
+    ctx.fillRect(p.x - p.s/2, p.y - p.s/2, p.s, p.s);
+  }
+  ctx.globalAlpha = 1; ctx.restore();
+
+  // Overlay muerte (sin pantalla completa — estilo GD muere y vuelve rápido)
+  if (!G.alive && G.particles.length === 0) {
+    // Auto-restart tras 60 frames de muerte
+    if (!G._deathTimer) G._deathTimer = 0;
+    G._deathTimer++;
+    if (G._deathTimer > 60) {
+      G._deathTimer = 0;
+      resetG();
+    }
+  } else {
+    G._deathTimer = 0;
+  }
+}
+
+// ── HUD ──
+function updateHUD() {
+  const pct = Math.min(100, Math.round(G.wx / LEVEL_END * 100));
+  document.getElementById('hud-bar').style.width = pct + '%';
+  document.getElementById('hud-pct').textContent = pct + '%';
+  document.getElementById('hud-attempts').textContent = 'Attempt ' + attempt;
+  document.getElementById('prog-bar').style.width = pct + '%';
+}
+
+// ── LOOP ──
+function loop() {
+  update();
+  render();
+  if (G.won) { showWin(); return; }
+  RAF = requestAnimationFrame(loop);
+}
+
+// ── PAUSA ──
+function togglePause() {
+  if (!gameRunning) return;
+  paused = !paused;
+  if (paused) {
+    audio.pause();
+    showOverlay('PAUSA', 'ESPACIO PARA CONTINUAR', false);
+  } else {
+    audio.play().catch(()=>{});
+    hideOverlay();
+  }
+}
+
+// ── OVERLAY ──
+function showOverlay(title, sub, showMenu) {
+  document.getElementById('ov-title').textContent = title;
+  document.getElementById('ov-sub').textContent   = sub;
+  document.getElementById('ov-menu').style.display = showMenu ? 'block' : 'none';
+  document.getElementById('overlay').classList.add('show');
+}
+function hideOverlay() {
+  document.getElementById('overlay').classList.remove('show');
+}
+
+function showWin() {
+  if (RAF) { cancelAnimationFrame(RAF); RAF = null; }
+  audio.pause();
+  gameRunning = false;
+  document.getElementById('ov-title').textContent  = '¡NIVEL COMPLETO!';
+  document.getElementById('ov-sub').textContent    = 'STEREO MADNESS · 1★';
+  document.getElementById('ov-stars').innerHTML    =
+    '<span style="color:#ffdd00">★</span><span style="color:#ffdd00">★</span><span style="color:#ffdd00">★</span>';
+  document.getElementById('ov-btns').innerHTML =
+    '<button class="ov-btn" id="ov-play" style="background:#ffdd00;color:#1a1000;">▶ DE NUEVO</button>';
+  document.getElementById('ov-menu').style.display = 'none';
+  document.getElementById('ov-hint').textContent = '';
+  document.getElementById('overlay').classList.add('show');
+  document.getElementById('ov-play').onclick = startGame;
+}
+
+// ── INICIO ──
+function startGame() {
+  hideOverlay();
+  resetG();
+  G.wx = 200; attempt = Math.max(1, attempt - 1);
+  // Ajustar estrellas del overlay por si se volvió al menú
+  document.getElementById('ov-stars').innerHTML =
+    '<span style="color:#ffdd00">★</span><span style="color:#333">★</span><span style="color:#333">★</span>';
+  gameRunning = true; paused = false;
+  if (RAF) { cancelAnimationFrame(RAF); RAF = null; }
+  audio.currentTime = 0;
+  audio.play().catch(() => {});
+  RAF = requestAnimationFrame(loop);
+}
+
+// ── BOTONES ──
+document.getElementById('ov-play').onclick = startGame;
+document.getElementById('btn-pause').onclick = togglePause;
+document.getElementById('ov-menu').onclick = () => {
+  hideOverlay(); paused = false;
+  showOverlay('STEREO MADNESS', 'PRESIONA ESPACIO O CLIC PARA JUGAR', false);
+};
+
+// Mostrar overlay inicial
+showOverlay('STEREO MADNESS', 'PRESIONA ESPACIO O CLIC PARA JUGAR', false);
+</script>
+</body>
+</html>
